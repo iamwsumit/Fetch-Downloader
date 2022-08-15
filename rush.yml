@@ -1,0 +1,44 @@
+# For a detailed info on this file and supported fields, check out the below link:
+# https://github.com/ShreyashSaitwal/rush-cli/wiki/Metadata-File
+
+---
+name: FetchDownloader
+description: This extension allow you to download big files to any paths with a lot of new features. <br> Developed By <a href="https://community.kodular.io/u/sumit1334/" target ="_blank">Sumit</a> with <a href="https://community.kodular.io/t/rush-a-new-and-improved-way-of-building-extensions/111470?u=sumit1334" target="_blank">Rush</a>.
+
+version:
+  number: auto
+  name: '1.1.0'
+
+authors:
+  - Sumit
+
+build:
+  kotlin:
+    enable: true
+
+  release:
+    # Optimizes the extension on every release build.
+    optimize: true
+
+  # If enabled, you will be able to use Java 8 language features in your extension.
+  desugar:
+    enable: false
+    desugar_deps: false
+
+assets:
+  # Extension icon. This can be a URL or a local image in 'assets' folder.
+  icon: icon.png
+  # Extension assets.
+  # other:
+  #   - my_awesome_asset.anything
+
+# Extension dependencies (JAR).
+# deps:
+#   - my_awesome_library.jar
+deps:
+  - fetch.jar
+  - fetch-core.jar
+  - room.jar
+  - room-common.jar
+  - sqlite.jar
+  - sqlite-framework.jar

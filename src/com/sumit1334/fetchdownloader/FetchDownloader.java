@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.util.Log;
+import androidx.core.content.ContextCompat;
 import com.google.appinventor.components.annotations.DesignerProperty;
 import com.google.appinventor.components.annotations.SimpleEvent;
 import com.google.appinventor.components.annotations.SimpleFunction;
@@ -34,98 +35,61 @@ import java.util.Locale;
 
 public class FetchDownloader extends AndroidNonvisibleComponent implements Component, OnDestroyListener {
     private final Context context;
-    private final HashMap<String, Download> downloads = new HashMap<>();
-    private final HashMap<Download, String> ids = new HashMap<>();
     private final String TAG = "Fetch";
+    private final HashMap<String, Integer> intIds = new HashMap<>();
+    private final HashMap<Integer, String> stringIds = new HashMap<>();
     private Fetch fetch;
     private NetworkType networkType = NetworkType.ALL;
     private boolean convertBytes = false;
 
-    private String id = "";
-    private int lastId = 0;
-
     private final AbstractFetchListener listener = new AbstractFetchListener() {
         @Override
         public void onCancelled(@NotNull Download download) {
-            if (lastId == download.getId()) {
-                lastId = 0;
-                return;
-            }
-            lastId = download.getId();
-            downloads.remove(ids.get(download));
-            ids.remove(download);
-            DownloadCancelled(ids.get(download));
+            String id = stringIds.get(download.getId());
+            stringIds.remove(download.getId());
+            intIds.remove(id);
+            DownloadCancelled(id);
         }
 
         @Override
         public void onCompleted(@NotNull Download download) {
-            if (lastId == download.getId()) {
-                lastId = 0;
-                return;
-            }
-            lastId = download.getId();
-            DownloadCompleted(ids.get(download));
-            downloads.remove(ids.get(download));
-            ids.remove(download);
+            String id = stringIds.get(download.getId());
+            stringIds.remove(download.getId());
+            intIds.remove(id);
+            DownloadCompleted(id);
         }
 
         @Override
         public void onError(@NotNull Download download, @NotNull Error error, @Nullable Throwable throwable) {
-            if (lastId == download.getId()) {
-                lastId = 0;
-                return;
-            }
-            lastId = download.getId();
-            downloads.remove(ids.get(download));
-            ids.remove(download);
-            ErrorOccurred(ids.get(download), error.toString());
+            String id = stringIds.get(download.getId());
+            stringIds.remove(download.getId());
+            intIds.remove(id);
+            ErrorOccurred(id, error.toString());
         }
 
         @Override
         public void onPaused(@NotNull Download download) {
-            if (lastId == download.getId()) {
-                lastId = 0;
-                return;
-            }
-            lastId = download.getId();
-            DownloadPaused(ids.get(download));
+            String id = stringIds.get(download.getId());
+            DownloadPaused(id);
         }
 
         @Override
         public void onProgress(@NotNull Download download, long etaInMilliSeconds, long downloadedBytesPerSecond) {
-            ProgressChanged(ids.get(download), download.getProgress(), etaInMilliSeconds, downloadedBytesPerSecond, download.getDownloaded(), download.getTotal());
+            ProgressChanged(stringIds.get(download.getId()), download.getProgress(), etaInMilliSeconds, downloadedBytesPerSecond, download.getDownloaded(), download.getTotal());
         }
 
         @Override
         public void onQueued(@NotNull Download download, boolean waitingOnNetwork) {
-            downloads.put(id, download);
-            ids.put(download, id);
-            if (lastId == download.getId()) {
-                lastId = 0;
-                return;
-            }
-            lastId = download.getId();
-            DownloadQueued(ids.get(download));
         }
 
         @Override
         public void onResumed(@NotNull Download download) {
-            if (lastId == download.getId()) {
-                lastId = 0;
-                return;
-            }
-            lastId = download.getId();
-            DownloadResumed(ids.get(download));
+            DownloadResumed(stringIds.get(download.getId()));
         }
 
         @Override
         public void onStarted(@NotNull Download download, @NotNull List<? extends DownloadBlock> downloadBlocks, int totalBlocks) {
-            if (lastId == download.getId()) {
-                lastId = 0;
-                return;
-            }
-            lastId = download.getId();
-            DownloadStarted(ids.get(download));
+            DownloadStarted(stringIds.get(download.getId()));
         }
     };
 
@@ -222,8 +186,8 @@ public class FetchDownloader extends AndroidNonvisibleComponent implements Compo
 
     @SimpleFunction(description = "Returns true if we have write external storage permission granted")
     public boolean PermissionGranted() {
-        int permission = context.checkCallingOrSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-        return permission == PackageManager.PERMISSION_GRANTED;
+        int permission = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        return permission != PackageManager.PERMISSION_DENIED;
     }
 
     @SimpleProperty(description = "Specifies the network type that you want to run your downloads on")
@@ -232,16 +196,18 @@ public class FetchDownloader extends AndroidNonvisibleComponent implements Compo
     }
 
     @SimpleFunction
-    public void DownloadFile(String id, String path, String url) {
+    public void DownloadFile(final String id, final String path, final String url) {
         try {
             Request request = new Request(url, path);
             request.setAutoRetryMaxAttempts(0);
-            this.id = id;
             request.setNetworkType(networkType);
             if (fetch != null) {
                 fetch.enqueue(request, new Func<Request>() {
                     @Override
                     public void call(@NotNull Request request) {
+                        intIds.put(id, request.getId());
+                        stringIds.put(request.getId(), id);
+                        DownloadQueued(id);
                     }
                 }, new Func<Error>() {
                     @Override
@@ -258,56 +224,28 @@ public class FetchDownloader extends AndroidNonvisibleComponent implements Compo
 
     @SimpleFunction
     public void Pause(String id) {
-        if (this.downloads.containsKey(id))
-            fetch.pause(downloads.get(id).getId());
+        if (this.intIds.containsKey(id))
+            fetch.pause(intIds.get(id));
         else
             throw new IllegalStateException("Id does not exist");
     }
 
     @SimpleFunction
     public void Resume(String id) {
-        if (this.downloads.containsKey(id))
-            fetch.resume(downloads.get(id).getId());
+        if (this.intIds.containsKey(id))
+            fetch.resume(intIds.get(id));
         else
             throw new IllegalStateException("Id does not exist");
     }
 
     @SimpleFunction
     public void Cancel(String id) {
-        if (this.downloads.containsKey(id)) {
-            fetch.delete(downloads.get(id).getId());
-            ids.remove(downloads.get(id));
-            downloads.remove(id);
+        if (this.intIds.containsKey(id)) {
+            fetch.delete(intIds.get(id));
+            stringIds.remove(intIds.get(id));
+            intIds.remove(id);
         } else
             throw new IllegalStateException("Id does not exist");
-    }
-
-    @SimpleFunction(description = "[DEPRECATED] Returns the total file size that will be downloaded, in bytes")
-    public long GetFileSize(String id) {
-        if (this.downloads.containsKey(id))
-            return downloads.get(id).getTotal();
-        throw new IllegalStateException("Id does not exist");
-    }
-
-    @SimpleFunction(description = "[DEPRECATED] Returns the progress of the download between 0 and 100")
-    public long GetProgress(String id) {
-        if (this.downloads.containsKey(id)) {
-            int progress = downloads.get(id).getProgress();
-            return progress == -1 ? 0 : progress;
-        }
-        throw new IllegalStateException("Id does not exist");
-    }
-
-    @SimpleFunction(description = "[DEPRECATED] Returns the downloaded size of the file in bytes")
-    public long GetDownloadedSize(String id) {
-        try {
-            if (this.downloads.containsKey(id))
-                downloads.get(id).getDownloaded();
-            throw new IllegalStateException("Id does not exist");
-        } catch (Exception e) {
-            Log.e(TAG, "GetDownloadedSize: ", e);
-            return 0;
-        }
     }
 
     @SimpleFunction
@@ -317,13 +255,15 @@ public class FetchDownloader extends AndroidNonvisibleComponent implements Compo
 
     @SimpleFunction(description = "This block cancel all the downloads")
     public void CancelAllDownloads() {
-        this.downloads.clear();
+        this.stringIds.clear();
+        this.intIds.clear();
         this.fetch.removeAll();
     }
 
     @SimpleFunction(description = "This block delete all the downloaded files from cache or from the file manager")
     public void DeleteAllDownloads() {
-        this.downloads.clear();
+        stringIds.clear();
+        intIds.clear();
         this.fetch.deleteAll();
     }
 

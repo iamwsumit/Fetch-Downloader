@@ -7,7 +7,7 @@ description: This extension allow you to download big files to any paths with a 
 
 version:
   number: auto
-  name: '1.1.0'
+  name: '1.2.0'
 
 authors:
   - Sumit

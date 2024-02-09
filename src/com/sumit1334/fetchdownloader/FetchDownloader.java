@@ -320,17 +320,6 @@ public class FetchDownloader extends AndroidNonvisibleComponent implements Compo
 
     @Override
     public void onDestroy() {
-        if (fetch != null) {
-            fetch.getDownloads(new Func<List<Download>>() {
-                @Override
-                public void call(@NotNull List<Download> downloads) {
-                    for (Download download : downloads) {
-                        if (download.getStatus() != Status.COMPLETED)
-                            fetch.delete(download.getId());
-                    }
-                }
-            });
             fetch.close();
-        }
     }
 }
